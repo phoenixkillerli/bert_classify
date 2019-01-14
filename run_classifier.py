@@ -1,5 +1,4 @@
 import collections
-import csv
 import os
 
 import tensorflow as tf
@@ -7,6 +6,7 @@ import tensorflow as tf
 import modeling
 import optimization
 import tokenization
+from task import DataProcessor
 
 flags = tf.flags
 
@@ -103,27 +103,6 @@ flags.DEFINE_integer(
     "Only used if `use_tpu` is True. Total number of TPU cores to use.")
 
 
-class InputExample(object):
-    """A single training/test example for simple sequence classification."""
-
-    def __init__(self, guid, text_a, text_b=None, label=None):
-        """Constructs a InputExample.
-
-        Args:
-          guid: Unique id for the example.
-          text_a: string. The untokenized text of the first sequence. For single
-            sequence tasks, only this sequence must be specified.
-          text_b: (Optional) string. The untokenized text of the second sequence.
-            Only must be specified for sequence pair tasks.
-          label: (Optional) string. The label of the example. This should be
-            specified for train and dev examples, but not for test examples.
-        """
-        self.guid = guid
-        self.text_a = text_a
-        self.text_b = text_b
-        self.label = label
-
-
 class PaddingInputExample(object):
     """Fake example so the num input examples is a multiple of the batch size.
 
@@ -151,50 +130,6 @@ class InputFeatures(object):
         self.segment_ids = segment_ids
         self.label_id = label_id
         self.is_real_example = is_real_example
-
-
-class DataProcessor(object):
-    """Base class for data converters for sequence classification data sets."""
-
-    def get_train_examples(self, data_dir):
-        return self._create_examples(DataProcessor._read_csv(os.path.join(data_dir, "train.csv")), "train")
-
-    def get_dev_examples(self, data_dir):
-        return self._create_examples(
-            DataProcessor._read_csv(os.path.join(data_dir, "valid.csv")),
-            "valid")
-
-    def get_test_examples(self, data_dir):
-        return self._create_examples(
-            DataProcessor._read_csv(os.path.join(data_dir, "test.csv")), "test")
-
-    def get_labels(self):
-        return ["报案人", "受害人", "嫌疑人", "警察"]
-
-    @staticmethod
-    def _create_examples(lines, set_type):
-        """Creates examples for the training and dev sets."""
-        examples = []
-        for (i, line) in enumerate(lines):
-            if i == 0:
-                continue
-            guid = "%s-%s" % (set_type, tokenization.convert_to_unicode(line[0]))
-            text_a = tokenization.convert_to_unicode(line[1])
-            text_b = tokenization.convert_to_unicode(line[2])
-            label = tokenization.convert_to_unicode(line[3])
-            examples.append(
-                InputExample(guid=guid, text_a=text_a, text_b=text_b, label=label))
-        return examples
-
-    @classmethod
-    def _read_csv(cls, input_file, quotechar=None):
-        """Reads a tab separated value file."""
-        with open(input_file, "r") as f:
-            reader = csv.reader(f, quotechar=quotechar)
-            lines = []
-            for line in reader:
-                lines.append(line)
-            return lines
 
 
 def convert_single_example(example, label_list, max_seq_length, tokenizer):
@@ -455,7 +390,6 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
             tf.logging.info("  name = %s, shape = %s%s", var.name, var.shape,
                             init_string)
 
-        output_spec = None
         if mode == tf.estimator.ModeKeys.TRAIN:
 
             train_op = optimization.create_optimizer(
@@ -543,7 +477,7 @@ def input_fn_builder(features, seq_length, is_training, drop_remainder):
             d = d.repeat()
             d = d.shuffle(buffer_size=100)
 
-        d = d.batch(batch_size=batch_size, drop_remainder=drop_remainder)
+        d = d.batch(batch_size=batch_size)
         return d
 
     return input_fn
@@ -658,9 +592,9 @@ def main(_):
             is_training=True,
             drop_remainder=True)
         estimator.train(input_fn=train_input_fn, max_steps=num_train_steps)
-
-        estimator.export_savedmodel('./saved_model/', serving_input_fn,
-                                    strip_default_attrs=True)
+        # 输出saved_model
+        estimator.estimator._export_to_tpu = False
+        estimator.export_savedmodel('./saved_model/', serving_input_fn, strip_default_attrs=True)
     if FLAGS.do_eval:
         eval_examples = processor.get_dev_examples(FLAGS.data_dir)
         num_actual_eval_examples = len(eval_examples)

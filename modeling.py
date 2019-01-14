@@ -297,7 +297,6 @@ def get_activation(activation_string):
 
 def get_assignment_map_from_checkpoint(tvars, init_checkpoint):
     """Compute the union of the current variables and checkpoint variables."""
-    assignment_map = {}
     initialized_variable_names = {}
 
     name_to_variable = collections.OrderedDict()
@@ -319,7 +318,7 @@ def get_assignment_map_from_checkpoint(tvars, init_checkpoint):
         initialized_variable_names[name] = 1
         initialized_variable_names[name + ":0"] = 1
 
-    return (assignment_map, initialized_variable_names)
+    return assignment_map, initialized_variable_names
 
 
 def dropout(input_tensor, dropout_prob):
@@ -404,7 +403,7 @@ def embedding_lookup(input_ids,
 
     output = tf.reshape(output,
                         input_shape[0:-1] + [input_shape[-1] * embedding_size])
-    return (output, embedding_table)
+    return output, embedding_table
 
 
 def embedding_postprocessor(input_tensor,
@@ -628,7 +627,7 @@ def attention_layer(from_tensor,
         from_seq_length = from_shape[1]
         to_seq_length = to_shape[1]
     elif len(from_shape) == 2:
-        if (batch_size is None or from_seq_length is None or to_seq_length is None):
+        if batch_size is None or from_seq_length is None or to_seq_length is None:
             raise ValueError(
                 "When passing in rank 2 tensors to attention_layer, the values "
                 "for `batch_size`, `from_seq_length`, and `to_seq_length` "
@@ -826,7 +825,6 @@ def transformer_model(input_tensor,
                         to_seq_length=seq_length)
                     attention_heads.append(attention_head)
 
-                attention_output = None
                 if len(attention_heads) == 1:
                     attention_output = attention_heads[0]
                 else:
@@ -915,8 +913,7 @@ def reshape_to_matrix(input_tensor):
     """Reshapes a >= rank 2 tensor to a rank 2 tensor (i.e., a matrix)."""
     ndims = input_tensor.shape.ndims
     if ndims < 2:
-        raise ValueError("Input tensor must have at least rank 2. Shape = %s" %
-                         (input_tensor.shape))
+        raise ValueError("Input tensor must have at least rank 2. Shape = %s" % input_tensor.shape)
     if ndims == 2:
         return input_tensor
 
