@@ -1,5 +1,5 @@
-import csv
 import codecs
+import csv
 import os
 
 import tokenization
@@ -45,7 +45,8 @@ class DataProcessor(object):
 
     @staticmethod
     def get_labels():
-        return ["报案人", "受害人", "嫌疑人", "警察"]
+        return ["暴力破锁", "其他侵入", "翻窗", "暴力破锁", "技术开锁插片开锁", "溜门", "特征不明显",
+                "踹门撞门暴力破门", "翻墙", "撬窗", "砸窗"]
 
     @staticmethod
     def _create_examples(lines, set_type):
