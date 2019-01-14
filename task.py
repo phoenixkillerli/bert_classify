@@ -1,4 +1,5 @@
 import csv
+import codecs
 import os
 
 import tokenization
@@ -63,7 +64,7 @@ class DataProcessor(object):
     @classmethod
     def _read_csv(cls, input_file, quotechar=None):
         """Reads a tab separated value file."""
-        with open(input_file, "r") as f:
+        with codecs.open(input_file, "r", "utf-8") as f:
             reader = csv.reader(f, quotechar=quotechar)
             lines = []
             for line in reader:

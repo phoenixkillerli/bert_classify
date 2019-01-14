@@ -178,11 +178,11 @@ def convert_single_example(example, label_list, max_seq_length, tokenizer):
     # For classification tasks, the first vector (corresponding to [CLS]) is
     # used as the "sentence vector". Note that this only makes sense because
     # the entire model is fine-tuned.
-    tokens = ["[CLS]"] + tokens_a + ["SEP"]
+    tokens = ["[CLS]"] + tokens_a + ["[SEP]"]
     segment_ids = [0] * len(tokens)
 
     if tokens_b:
-        tokens += tokens_b + ["SEP"]
+        tokens += tokens_b + ["[SEP]"]
         segment_ids += [1] * (len(tokens_b) + 1)
 
     input_ids = tokenizer.convert_tokens_to_ids(tokens)
@@ -194,9 +194,8 @@ def convert_single_example(example, label_list, max_seq_length, tokenizer):
     # Zero-pad up to the sequence length.
     if len(input_ids) < max_seq_length:
         input_ids += [0] * (max_seq_length - len(input_ids))
-        input_mask += [0] * (max_seq_length - len(input_ids))
-        segment_ids += [0] * (max_seq_length - len(input_ids))
-
+        input_mask += [0] * (max_seq_length - len(input_mask))
+        segment_ids += [0] * (max_seq_length - len(segment_ids))
     assert len(input_ids) == max_seq_length
     assert len(input_mask) == max_seq_length
     assert len(segment_ids) == max_seq_length

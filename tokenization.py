@@ -1,3 +1,4 @@
+import codecs
 import collections
 import unicodedata
 
@@ -16,7 +17,7 @@ def load_vocab(vocab_file):
     """Loads a vocabulary file into a dictionary."""
     vocab = collections.OrderedDict()
     index = 0
-    with open(vocab_file, "r") as reader:
+    with codecs.open(vocab_file, "r", "utf-8") as reader:
         while True:
             token = reader.readline()
             if not token:
