@@ -592,7 +592,7 @@ def main(_):
             drop_remainder=True)
         estimator.train(input_fn=train_input_fn, max_steps=num_train_steps)
         # 输出saved_model
-        estimator.estimator._export_to_tpu = False
+        estimator._export_to_tpu = False
         estimator.export_savedmodel('./saved_model/', serving_input_fn, strip_default_attrs=True)
     if FLAGS.do_eval:
         eval_examples = processor.get_dev_examples(FLAGS.data_dir)
