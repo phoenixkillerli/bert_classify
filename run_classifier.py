@@ -44,7 +44,7 @@ flags.DEFINE_bool(
     "models and False for cased models.")
 
 flags.DEFINE_integer(
-    "max_seq_length", 128,
+    "max_seq_length", 512,
     "The maximum total input sequence length after WordPiece tokenization. "
     "Sequences longer than this will be truncated, and sequences shorter "
     "than this will be padded.")
@@ -658,9 +658,13 @@ def main(_):
                 probabilities = prediction["probabilities"]
                 if i >= num_actual_predict_examples:
                     break
-                output_line = "\t".join(
-                    str(class_probability)
-                    for class_probability in probabilities) + "\n"
+                # output_line = "\t".join(
+                #     str(class_probability)
+                #     for class_probability in probabilities) + "\n"
+                tt = probabilities.tolist()
+                label = label_list[tt.index(max(tt))]
+                temp = predict_examples[i]
+                output_line = ','.join([temp.guid, temp.text_a, temp.text_b, temp.label, label]) + '\n'
                 writer.write(output_line)
                 num_written_lines += 1
         assert num_written_lines == num_actual_predict_examples
