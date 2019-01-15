@@ -55,11 +55,11 @@ flags.DEFINE_bool("do_eval", True, "Whether to run eval on the dev set.")
 
 flags.DEFINE_bool("do_predict", True, "Whether to run the model in inference mode on the test set.")
 
-flags.DEFINE_integer("train_batch_size", 32, "Total batch size for training.")
+flags.DEFINE_integer("train_batch_size", 4, "Total batch size for training.")
 
-flags.DEFINE_integer("eval_batch_size", 8, "Total batch size for eval.")
+flags.DEFINE_integer("eval_batch_size", 4, "Total batch size for eval.")
 
-flags.DEFINE_integer("predict_batch_size", 8, "Total batch size for predict.")
+flags.DEFINE_integer("predict_batch_size", 4, "Total batch size for predict.")
 
 flags.DEFINE_float("learning_rate", 5e-5, "The initial learning rate for Adam.")
 
@@ -75,32 +75,6 @@ flags.DEFINE_integer("save_checkpoints_steps", 1000,
 
 flags.DEFINE_integer("iterations_per_loop", 1000,
                      "How many steps to make in each estimator call.")
-
-flags.DEFINE_bool("use_tpu", False, "Whether to use TPU or GPU/CPU.")
-
-tf.flags.DEFINE_string(
-    "tpu_name", None,
-    "The Cloud TPU to use for training. This should be either the name "
-    "used when creating the Cloud TPU, or a grpc://ip.address.of.tpu:8470 "
-    "url.")
-
-tf.flags.DEFINE_string(
-    "tpu_zone", None,
-    "[Optional] GCE zone where the Cloud TPU is located in. If not "
-    "specified, we will attempt to automatically detect the GCE project from "
-    "metadata.")
-
-tf.flags.DEFINE_string(
-    "gcp_project", None,
-    "[Optional] Project name for the Cloud TPU-enabled project. If not "
-    "specified, we will attempt to automatically detect the GCE project from "
-    "metadata.")
-
-tf.flags.DEFINE_string("master", None, "[Optional] TensorFlow master URL.")
-
-flags.DEFINE_integer(
-    "num_tpu_cores", 8,
-    "Only used if `use_tpu` is True. Total number of TPU cores to use.")
 
 
 class PaddingInputExample(object):
@@ -430,60 +404,6 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
 
 # This function is not used by this file but is still used by the Colab and
 # people who depend on it.
-def input_fn_builder(features, seq_length, is_training, drop_remainder):
-    """Creates an `input_fn` closure to be passed to TPUEstimator."""
-
-    all_input_ids = []
-    all_input_mask = []
-    all_segment_ids = []
-    all_label_ids = []
-
-    for feature in features:
-        all_input_ids.append(feature.input_ids)
-        all_input_mask.append(feature.input_mask)
-        all_segment_ids.append(feature.segment_ids)
-        all_label_ids.append(feature.label_id)
-
-    def input_fn(params):
-        """The actual input function."""
-        batch_size = params["batch_size"]
-
-        num_examples = len(features)
-
-        # This is for demo purposes and does NOT scale to large data sets. We do
-        # not use Dataset.from_generator() because that uses tf.py_func which is
-        # not TPU compatible. The right way to load data is with TFRecordReader.
-        d = tf.data.Dataset.from_tensor_slices({
-            "input_ids":
-                tf.constant(
-                    all_input_ids, shape=[num_examples, seq_length],
-                    dtype=tf.int32),
-            "input_mask":
-                tf.constant(
-                    all_input_mask,
-                    shape=[num_examples, seq_length],
-                    dtype=tf.int32),
-            "segment_ids":
-                tf.constant(
-                    all_segment_ids,
-                    shape=[num_examples, seq_length],
-                    dtype=tf.int32),
-            "label_ids":
-                tf.constant(all_label_ids, shape=[num_examples], dtype=tf.int32),
-        })
-
-        if is_training:
-            d = d.repeat()
-            d = d.shuffle(buffer_size=100)
-
-        d = d.batch(batch_size=batch_size)
-        return d
-
-    return input_fn
-
-
-# This function is not used by this file but is still used by the Colab and
-# people who depend on it.
 def convert_examples_to_features(examples, label_list, max_seq_length,
                                  tokenizer):
     """Convert a set of `InputExample`s to a list of `InputFeatures`."""
@@ -537,16 +457,7 @@ def main(_):
     tokenizer = tokenization.FullTokenizer(
         vocab_file=FLAGS.vocab_file, do_lower_case=FLAGS.do_lower_case)
 
-    is_per_host = tf.contrib.tpu.InputPipelineConfig.PER_HOST_V2
-    run_config = tf.contrib.tpu.RunConfig(
-        cluster=None,
-        master=FLAGS.master,
-        model_dir=FLAGS.output_dir,
-        save_checkpoints_steps=FLAGS.save_checkpoints_steps,
-        tpu_config=tf.contrib.tpu.TPUConfig(
-            iterations_per_loop=FLAGS.iterations_per_loop,
-            num_shards=FLAGS.num_tpu_cores,
-            per_host_input_for_training=is_per_host))
+    run_config = tf.contrib.tpu.RunConfig()
 
     train_examples = None
     num_train_steps = None
@@ -564,7 +475,7 @@ def main(_):
         learning_rate=FLAGS.learning_rate,
         num_train_steps=num_train_steps,
         num_warmup_steps=num_warmup_steps,
-        use_tpu=FLAGS.use_tpu,
+        use_tpu=False,
         use_one_hot_embeddings=False)
 
     # If TPU is not available, this will fall back to normal Estimator on CPU
@@ -636,10 +547,8 @@ def main(_):
                                                 predict_file)
 
         tf.logging.info("***** Running prediction*****")
-        tf.logging.info("  Num examples = %d (%d actual, %d padding)",
-                        len(predict_examples), num_actual_predict_examples,
-                        len(predict_examples) - num_actual_predict_examples)
-        tf.logging.info("  Batch size = %d", FLAGS.predict_batch_size)
+        tf.logging.info("  Num examples = %d,  Batch size = %d",
+                        len(predict_examples), FLAGS.predict_batch_size)
 
         predict_drop_remainder = False
         predict_input_fn = file_based_input_fn_builder(
@@ -650,7 +559,7 @@ def main(_):
 
         result = estimator.predict(input_fn=predict_input_fn)
 
-        output_predict_file = os.path.join(FLAGS.output_dir, "test_results.tsv")
+        output_predict_file = os.path.join(FLAGS.output_dir, "test_results.csv")
         with tf.gfile.GFile(output_predict_file, "w") as writer:
             num_written_lines = 0
             tf.logging.info("***** Predict results *****")
@@ -658,13 +567,10 @@ def main(_):
                 probabilities = prediction["probabilities"]
                 if i >= num_actual_predict_examples:
                     break
-                # output_line = "\t".join(
-                #     str(class_probability)
-                #     for class_probability in probabilities) + "\n"
                 tt = probabilities.tolist()
                 label = label_list[tt.index(max(tt))]
                 temp = predict_examples[i]
-                output_line = ','.join([temp.guid, temp.text_a, temp.text_b, temp.label, label]) + '\n'
+                output_line = ','.join([temp.guid, temp.text_a, temp.label, label]) + '\n'
                 writer.write(output_line)
                 num_written_lines += 1
         assert num_written_lines == num_actual_predict_examples

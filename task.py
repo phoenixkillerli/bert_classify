@@ -1,25 +1,16 @@
 import codecs
 import csv
 import os
+import re
 
 import tokenization
 
+# 提取特征相关子句（处理长度超过max_seq_length）
+pattern = r'([^，。；：）\]、]*?(?:门|窗|锁|撬|墙|阳台|挑|水管|爬|撬|踹|砸|钥匙|顺手|[^警案害疑]人|家[^中属]|玻璃).*?[，。；：）\]、])'
+
 
 class InputExample(object):
-    """A single training/test example for simple sequence classification."""
-
     def __init__(self, guid, text_a, text_b=None, label=None):
-        """Constructs a InputExample.
-
-        Args:
-          guid: Unique id for the example.
-          text_a: string. The untokenized text of the first sequence. For single
-            sequence tasks, only this sequence must be specified.
-          text_b: (Optional) string. The untokenized text of the second sequence.
-            Only must be specified for sequence pair tasks.
-          label: (Optional) string. The label of the example. This should be
-            specified for train and dev examples, but not for test examples.
-        """
         self.guid = guid
         self.text_a = text_a
         self.text_b = text_b
@@ -56,14 +47,17 @@ class DataProcessor(object):
             if i == 0:
                 continue
             guid = "%s-%s" % (set_type, tokenization.convert_to_unicode(line[0]))
-            text_a = tokenization.convert_to_unicode(line[1])
+            text_a = ''.join(re.findall(pattern, line[1]))
+            if len(text_a) < 3:
+                text_a = '特征不明显'
+            text_a = re.sub(r'\d+', '', tokenization.convert_to_unicode(text_a))
             text_b = tokenization.convert_to_unicode(line[2]) if len(line) > 3 else None
             label = tokenization.convert_to_unicode(line[-1])
             examples.append(InputExample(guid=guid, text_a=text_a, text_b=text_b, label=label))
         return examples
 
-    @classmethod
-    def _read_csv(cls, input_file, quotechar=None):
+    @staticmethod
+    def _read_csv(input_file, quotechar=None):
         """Reads a tab separated value file."""
         with codecs.open(input_file, "r", "utf-8") as f:
             reader = csv.reader(f, quotechar=quotechar)
