@@ -48,7 +48,7 @@ class DataProcessor(object):
                 continue
             guid = "%s-%s" % (set_type, tokenization.convert_to_unicode(line[0]))
             text_a = ''.join(re.findall(pattern, line[1]))
-            if len(text_a) < 3:
+            if not text_a or len(text_a) < 3:
                 text_a = '特征不明显'
             text_a = re.sub(r'\d+', '', tokenization.convert_to_unicode(text_a))
             text_b = tokenization.convert_to_unicode(line[2]) if len(line) > 3 else None
