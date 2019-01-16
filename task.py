@@ -7,8 +7,8 @@ import tokenization
 
 # 提取特征相关子句（处理长度超过max_seq_length）
 pattern = re.compile(r'([^，。；：）\)\]、]*?'
-                     r'(?:[门窗锁墙]|阳台|水管|[挑爬撬踹砸撞破趁]|钥匙|顺手|[^警案害疑]人[^民]|家[^中属里庭]|玻璃)'
-                     r'.*?[，。；：）\]、])')
+                     r'(?:[门窗锁墙]|阳台|水管|[挑爬撬踹砸撞破趁]|技开|钥匙|顺手|[^警案害疑]人[^民]|家[^中属里庭]|玻璃)'
+                     r'.*?(?:[，。；：）\]、]|$))')
 
 
 class InputExample(object):
@@ -53,7 +53,7 @@ class DataProcessor(object):
                 continue
             guid = "%s-%s" % (set_type, tokenization.convert_to_unicode(line[0]))
             text_a = re.sub(r',', '，', line[1])
-            text_a = re.sub(r'[\n\r\t \d]', '', text_a)
+            text_a = re.sub(r'[\n\r\t \d年月日时分秒]', '', text_a)
             text_a = ''.join(re.findall(pattern, text_a))
             if len(text_a) < 3:
                 text_a = '特征不明显'
@@ -64,10 +64,10 @@ class DataProcessor(object):
         return examples
 
     @staticmethod
-    def _read_csv(input_file, quotechar=None):
+    def _read_csv(input_file):
         """Reads a tab separated value file."""
         with codecs.open(input_file, "r", "utf-8") as f:
-            reader = csv.reader(f, quotechar=quotechar)
+            reader = csv.reader(f, quotechar='"', dialect='excel', delimiter=',')
             lines = []
             for line in reader:
                 lines.append(line)
