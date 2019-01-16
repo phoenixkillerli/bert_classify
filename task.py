@@ -6,7 +6,9 @@ import re
 import tokenization
 
 # 提取特征相关子句（处理长度超过max_seq_length）
-pattern = r'([^，。；：）\]、]*?(?:门|窗|锁|撬|墙|阳台|挑|水管|爬|撬|踹|砸|钥匙|顺手|[^警案害疑]人|家[^中属]|玻璃).*?[，。；：）\]、])'
+pattern = re.compile(r'([^，。；：）)\]、]*?'
+                     r'(?:[门窗锁墙]|阳台|水管|[挑爬撬踹砸撞破趁]|钥匙|顺手|[^警案害疑]人[^民]|家[^中属里庭]|玻璃)'
+                     r'.*?[，。；：）\]、])')
 
 
 class InputExample(object):
@@ -22,16 +24,19 @@ class InputExample(object):
 class DataProcessor(object):
     """Base class for data converters for sequence classification data sets."""
 
-    def get_train_examples(self, data_dir):
-        return self._create_examples(DataProcessor._read_csv(os.path.join(data_dir, "train.csv")), "train")
+    @staticmethod
+    def get_train_examples(data_dir):
+        return DataProcessor._create_examples(DataProcessor._read_csv(os.path.join(data_dir, "train.csv")), "train")
 
-    def get_dev_examples(self, data_dir):
-        return self._create_examples(
+    @staticmethod
+    def get_dev_examples(data_dir):
+        return DataProcessor._create_examples(
             DataProcessor._read_csv(os.path.join(data_dir, "valid.csv")),
             "valid")
 
-    def get_test_examples(self, data_dir):
-        return self._create_examples(
+    @staticmethod
+    def get_test_examples(data_dir):
+        return DataProcessor._create_examples(
             DataProcessor._read_csv(os.path.join(data_dir, "test.csv")), "test")
 
     @staticmethod
@@ -47,10 +52,12 @@ class DataProcessor(object):
             if i == 0:
                 continue
             guid = "%s-%s" % (set_type, tokenization.convert_to_unicode(line[0]))
-            text_a = ''.join(re.findall(pattern, line[1]))
-            if not text_a or len(text_a) < 3:
+            text_a = re.sub(r',', '，', line[1])
+            text_a = re.sub(r'[\n\r\t \d]', '', text_a)
+            text_a = ''.join(re.findall(pattern, text_a))
+            if len(text_a) < 3:
                 text_a = '特征不明显'
-            text_a = re.sub(r'\d+', '', tokenization.convert_to_unicode(text_a))
+            text_a = tokenization.convert_to_unicode(text_a)
             text_b = tokenization.convert_to_unicode(line[2]) if len(line) > 3 else None
             label = tokenization.convert_to_unicode(line[-1])
             examples.append(InputExample(guid=guid, text_a=text_a, text_b=text_b, label=label))
