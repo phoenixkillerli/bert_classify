@@ -13,8 +13,10 @@ def convert_to_unicode(text):
         raise ValueError("Unsupported string type: %s" % (type(text)))
 
 
-def load_vocab(vocab_file):
+def load_vocab(vocab_file=None):
     """Loads a vocabulary file into a dictionary."""
+    if vocab_file is None:
+        vocab_file = './vocab.txt'
     vocab = collections.OrderedDict()
     index = 0
     with codecs.open(vocab_file, "r", "utf-8") as reader:
@@ -44,7 +46,7 @@ def whitespace_tokenize(text):
 class FullTokenizer(object):
     """Runs end-to-end tokenziation."""
 
-    def __init__(self, vocab_file, do_lower_case=True):
+    def __init__(self, vocab_file=None, do_lower_case=True):
         self.vocab = load_vocab(vocab_file)
         self.inv_vocab = {v: k for k, v in self.vocab.items()}
         self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)

@@ -1,0 +1,13 @@
+version: '3'
+services:
+        web:
+                build: ./web/
+                image: anhui:web
+                ports:
+                        - '5050:5000'
+                links:
+                        - model
+        model:
+                image: anhui:model
+                ports:
+                        - '8501:8501'

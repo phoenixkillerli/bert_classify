@@ -4,19 +4,23 @@ import os
 import re
 
 import tokenization
+from common_tool import InputExample
 
 # 提取特征相关子句（处理长度超过max_seq_length）
+
 pattern = re.compile(r'([^，。；：）\)\]、]*?'
                      r'(?:[门窗锁墙]|阳台|水管|[挑爬撬踹砸撞破趁]|技开|钥匙|顺手|[^警案害疑]人[^民]|家[^中属里庭]|玻璃)'
                      r'.*?(?:[，。；：）\]、]|$))')
 
 
-class InputExample(object):
-    def __init__(self, guid, text_a, text_b=None, label=None):
-        self.guid = guid
-        self.text_a = text_a
-        self.text_b = text_b
-        self.label = label
+def preprocess_txt(case):
+    text = re.sub(r',', '，', case)
+    text = re.sub(r'[\n\r\t \d年月日时分秒]', '', text)
+    text = ''.join(re.findall(pattern, text))
+    if len(text) < 3:
+        text = '特征不明显'
+    text = tokenization.convert_to_unicode(text)
+    return text
 
 
 # 数据格式(csv)
@@ -52,12 +56,7 @@ class DataProcessor(object):
             if i == 0:
                 continue
             guid = "%s-%s" % (set_type, tokenization.convert_to_unicode(line[0]))
-            text_a = re.sub(r',', '，', line[1])
-            text_a = re.sub(r'[\n\r\t \d年月日时分秒]', '', text_a)
-            text_a = ''.join(re.findall(pattern, text_a))
-            if len(text_a) < 3:
-                text_a = '特征不明显'
-            text_a = tokenization.convert_to_unicode(text_a)
+            text_a = preprocess_txt(line[1])
             text_b = tokenization.convert_to_unicode(line[2]) if len(line) > 3 else None
             label = tokenization.convert_to_unicode(line[-1])
             examples.append(InputExample(guid=guid, text_a=text_a, text_b=text_b, label=label))

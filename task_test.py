@@ -9,7 +9,7 @@ class TaskTest(tf.test.TestCase):
         data_dir = './data'
         test_example = task.DataProcessor.get_test_examples(data_dir)
         for x in test_example:
-            print(x.guid, x.text_a)
+            assert x.text_b is None
 
 
 if __name__ == "__main__":
