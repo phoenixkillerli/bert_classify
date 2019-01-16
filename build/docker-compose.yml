@@ -8,6 +8,7 @@ services:
                 links:
                         - model
         model:
+                build: ./model/
                 image: anhui:model
                 ports:
                         - '8501:8501'

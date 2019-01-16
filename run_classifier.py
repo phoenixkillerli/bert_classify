@@ -78,7 +78,7 @@ flags.DEFINE_integer("iterations_per_loop", 1000,
                      "How many steps to make in each estimator call.")
 
 
-def file_based_convert_examples_to_features(examples, label_list, max_seq_length, tokenizer, output_file):
+def file_based_convert_examples_to_features(examples, max_seq_length, tokenizer, output_file):
     """Convert a set of `InputExample`s to a TFRecord file."""
 
     writer = tf.python_io.TFRecordWriter(output_file)
@@ -87,7 +87,7 @@ def file_based_convert_examples_to_features(examples, label_list, max_seq_length
         if ex_index % 10000 == 0:
             tf.logging.info("Writing example %d of %d" % (ex_index, len(examples)))
 
-        feature = convert_single_example(example, label_list, max_seq_length, tokenizer)
+        feature = convert_single_example(example, max_seq_length, tokenizer)
 
         def create_int_feature(values):
             f = tf.train.Feature(int64_list=tf.train.Int64List(value=list(values)))
@@ -350,7 +350,7 @@ def main(_):
     if FLAGS.do_train:
         train_file = os.path.join(FLAGS.output_dir, "train.tf_record")
         file_based_convert_examples_to_features(
-            train_examples, label_list, FLAGS.max_seq_length, tokenizer, train_file)
+            train_examples, FLAGS.max_seq_length, tokenizer, train_file)
         tf.logging.info("***** Running training *****")
         tf.logging.info("  Num examples = %d", len(train_examples))
         tf.logging.info("  Batch size = %d", FLAGS.train_batch_size)
@@ -370,7 +370,7 @@ def main(_):
 
         eval_file = os.path.join(FLAGS.output_dir, "eval.tf_record")
         file_based_convert_examples_to_features(
-            eval_examples, label_list, FLAGS.max_seq_length, tokenizer, eval_file)
+            eval_examples, FLAGS.max_seq_length, tokenizer, eval_file)
 
         tf.logging.info("***** Running evaluation *****")
         tf.logging.info("  Num examples = %d (%d actual, %d padding)",
@@ -401,8 +401,7 @@ def main(_):
         num_actual_predict_examples = len(predict_examples)
 
         predict_file = os.path.join(FLAGS.output_dir, "predict.tf_record")
-        file_based_convert_examples_to_features(predict_examples, label_list,
-                                                FLAGS.max_seq_length, tokenizer,
+        file_based_convert_examples_to_features(predict_examples, FLAGS.max_seq_length, tokenizer,
                                                 predict_file)
 
         tf.logging.info("***** Running prediction*****")

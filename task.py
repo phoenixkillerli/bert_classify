@@ -1,26 +1,9 @@
 import codecs
 import csv
 import os
-import re
 
 import tokenization
-from common_tool import InputExample
-
-# 提取特征相关子句（处理长度超过max_seq_length）
-
-pattern = re.compile(r'([^，。；：）\)\]、]*?'
-                     r'(?:[门窗锁墙]|阳台|水管|[挑爬撬踹砸撞破趁]|技开|钥匙|顺手|[^警案害疑]人[^民]|家[^中属里庭]|玻璃)'
-                     r'.*?(?:[，。；：）\]、]|$))')
-
-
-def preprocess_txt(case):
-    text = re.sub(r',', '，', case)
-    text = re.sub(r'[\n\r\t \d年月日时分秒]', '', text)
-    text = ''.join(re.findall(pattern, text))
-    if len(text) < 3:
-        text = '特征不明显'
-    text = tokenization.convert_to_unicode(text)
-    return text
+from common_tool import InputExample, label_list, preprocess_txt
 
 
 # 数据格式(csv)
@@ -45,8 +28,7 @@ class DataProcessor(object):
 
     @staticmethod
     def get_labels():
-        return ["暴力破锁", "其他侵入", "翻窗", "暴力破锁", "技术开锁插片开锁", "溜门", "特征不明显",
-                "踹门撞门暴力破门", "翻墙", "撬窗", "砸窗"]
+        return label_list
 
     @staticmethod
     def _create_examples(lines, set_type):

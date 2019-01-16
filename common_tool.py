@@ -1,7 +1,16 @@
+import re
+
+import tokenization
 from tokenization import FullTokenizer
 
+pattern = re.compile(r'([^，。；：）\)\]、]*?'
+                     r'(?:[门窗锁墙]|阳台|水管|[挑爬撬踹砸撞破趁]|技开|钥匙|顺手|[^警案害疑]人[^民]|家[^中属里庭]|玻璃)'
+                     r'.*?(?:[，。；：）\]、]|$))')
 
-def convert_single_example(example, label_list, max_seq_length=256, tokenizer=FullTokenizer()):
+label_list = ["其他侵入", "溜门", "攀爬翻窗和阳台", "暴力破锁", "技术开锁/插片开锁", "撬窗", "踹门撞门暴力破门", "翻墙", "砸窗"]
+
+
+def convert_single_example(example, max_seq_length=256, tokenizer=FullTokenizer()):
     """Converts a single `InputExample` into a single `InputFeatures`."""
     label_map = {label: i for i, label in enumerate(label_list)}
 
@@ -60,7 +69,7 @@ def convert_single_example(example, label_list, max_seq_length=256, tokenizer=Fu
     assert len(input_mask) == max_seq_length
     assert len(segment_ids) == max_seq_length
 
-    label_id = label_map[example.label]
+    label_id = label_map[example.label] if example.label else 0
 
     feature = InputFeatures(
         input_ids=input_ids,
@@ -110,3 +119,14 @@ class InputExample(object):
         self.text_a = text_a
         self.text_b = text_b
         self.label = label
+
+
+# 提取特征相关子句（处理长度超过max_seq_length）
+def preprocess_txt(case):
+    text = re.sub(r',', '，', case)
+    text = re.sub(r'[\n\r\t \d年月日时分秒]', '', text)
+    text = ''.join(re.findall(pattern, text))
+    if len(text) < 3:
+        text = '特征不明显'
+    text = tokenization.convert_to_unicode(text)
+    return text
