@@ -1,9 +1,16 @@
 # Initially taken from Github's Python gitignore file
 # Distribution / packaging
-__pycache__/*
-output/*
-saved_model/*
-.idea/*
+__pycache__/
+output/
+saved_model/
+.idea/
 .pytest*
 data/*
-model/*
+model/
+
+build/
+!build/docker-compose.yml
+!build/model/Dockerfile
+!build/model/models.conf
+!build/web/Dockerfile
+!build/web/requirements.txt
