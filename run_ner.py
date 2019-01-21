@@ -1,3 +1,4 @@
+import codecs
 import collections
 import os
 
@@ -84,7 +85,7 @@ class NerProcessor():
     @classmethod
     def _read_data(cls, input_file):
         """Reads a BIO data."""
-        with open(input_file) as f:
+        with codecs.open(input_file, "r", "utf-8") as f:
             lines = []
             labels = ''
             words = ''
@@ -115,7 +116,7 @@ class NerProcessor():
 def write_tokens(tokens, mode):
     if mode == "test":
         path = os.path.join(FLAGS.output_dir, "token_" + mode + ".txt")
-        wf = open(path, 'a')
+        wf = codecs.open(path, 'a', "utf-8")
         for token in tokens:
             if token != "**NULL**":
                 wf.write(token + '\n')
@@ -147,7 +148,7 @@ def convert_single_example(example, max_seq_length, tokenizer, mode):
     input_mask = [1] * len(input_ids)
 
     if len(input_ids) < max_seq_length:
-        paddings = max_seq_length-len(input_ids)
+        paddings = max_seq_length - len(input_ids)
         input_ids += [0] * paddings
         input_mask += [0] * paddings
         label_ids += [0] * paddings
@@ -398,7 +399,7 @@ def main(_):
             drop_remainder=eval_drop_remainder)
         result = estimator.evaluate(input_fn=eval_input_fn, steps=eval_steps)
         output_eval_file = os.path.join(FLAGS.output_dir, "eval_results.txt")
-        with open(output_eval_file, "w") as writer:
+        with codecs.open(output_eval_file, "w", "utf-8") as writer:
             tf.logging.info("***** Eval results *****")
             for key in sorted(result.keys()):
                 tf.logging.info("  %s = %s", key, str(result[key]))
@@ -426,7 +427,7 @@ def main(_):
 
         result = estimator.predict(input_fn=predict_input_fn)
         output_predict_file = os.path.join(FLAGS.output_dir, "label_test.txt")
-        with open(output_predict_file, 'w') as writer:
+        with codecs.open(output_predict_file, 'w', "utf-8") as writer:
             for prediction in result:
                 output_line = "\n".join(id2label[id] for id in prediction if id != 0) + "\n"
                 writer.write(output_line)
