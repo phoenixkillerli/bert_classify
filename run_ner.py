@@ -1,6 +1,5 @@
 import collections
 import os
-import pickle
 
 import tensorflow as tf
 
@@ -8,6 +7,8 @@ import modeling
 import optimization
 import tf_metrics
 import tokenization
+
+# import pickle
 
 flags = tf.flags
 
@@ -44,6 +45,7 @@ flags.DEFINE_string("vocab_file", './vocab.txt',
                     "The vocabulary file that the BERT model was trained on.")
 
 label_list = ["B-MISC", "I-MISC", "O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "X", "[CLS]", "[SEP]"]
+label_map = {label: i for i, label in enumerate(label_list)}
 
 
 class InputExample(object):
@@ -84,24 +86,20 @@ class NerProcessor():
         """Reads a BIO data."""
         with open(input_file) as f:
             lines = []
-            words = []
-            labels = []
+            labels = ''
+            words = ''
             for line in f:
                 contends = line.strip()
-                word = line.strip().split(' ')[0]
-                label = line.strip().split(' ')[-1]
-                if contends.startswith("-DOCSTART-"):
-                    words.append('')
-                    continue
-                if len(contends) == 0 and words[-1] == '.':
-                    l = ' '.join([label for label in labels if len(label) > 0])
-                    w = ' '.join([word for word in words if len(word) > 0])
-                    lines.append([l, w])
-                    words = []
-                    labels = []
-                    continue
-                words.append(word)
-                labels.append(label)
+                word = contends.split('\t')[0]
+                label = contends.split('\t')[-1]
+                if len(contends) == 0 and len(labels) > 0:
+                    lines.append([labels, words])
+                    labels = ''
+                    words = ''
+                elif len(label) > 0 and len(word) > 0:
+                    labels += label + ' '
+                    words += word + ' '
+                continue
             return lines
 
     def _create_example(self, lines, set_type):
@@ -124,12 +122,7 @@ def write_tokens(tokens, mode):
         wf.close()
 
 
-def convert_single_example(ex_index, example, label_list, max_seq_length, tokenizer, mode):
-    label_map = {}
-    for (i, label) in enumerate(label_list, 1):
-        label_map[label] = i
-    with open('./output/label2id.pkl', 'wb') as w:
-        pickle.dump(label_map, w)
+def convert_single_example(example, max_seq_length, tokenizer, mode):
     textlist = example.text.split(' ')
     labellist = example.label.split(' ')
     tokens = []
@@ -143,58 +136,43 @@ def convert_single_example(ex_index, example, label_list, max_seq_length, tokeni
                 labels.append(label_1)
             else:
                 labels.append("X")
-    # tokens = tokenizer.tokenize(example.text)
     if len(tokens) >= max_seq_length - 1:
         tokens = tokens[0:(max_seq_length - 2)]
         labels = labels[0:(max_seq_length - 2)]
-    ntokens = []
-    segment_ids = []
-    label_ids = []
-    ntokens.append("[CLS]")
-    segment_ids.append(0)
-    # append("O") or append("[CLS]") not sure!
-    label_ids.append(label_map["[CLS]"])
-    for i, token in enumerate(tokens):
-        ntokens.append(token)
-        segment_ids.append(0)
-        label_ids.append(label_map[labels[i]])
-    ntokens.append("[SEP]")
-    segment_ids.append(0)
-    # append("O") or append("[SEP]") not sure!
-    label_ids.append(label_map["[SEP]"])
+
+    ntokens = ["[CLS]"] + tokens + ["[SEP]"]
+    label_ids = [label_map["[CLS]"]] + [label_map[k] for k in labels] + [label_map["[SEP]"]]
+
     input_ids = tokenizer.convert_tokens_to_ids(ntokens)
     input_mask = [1] * len(input_ids)
-    # label_mask = [1] * len(input_ids)
-    while len(input_ids) < max_seq_length:
-        input_ids.append(0)
-        input_mask.append(0)
-        segment_ids.append(0)
-        # we don't concerned about it!
-        label_ids.append(0)
-        ntokens.append("**NULL**")
+
+    if len(input_ids) < max_seq_length:
+        paddings = max_seq_length-len(input_ids)
+        input_ids += [0] * paddings
+        input_mask += [0] * paddings
+        label_ids += [0] * paddings
+        ntokens += ["**NULL**"] * paddings
+
     assert len(input_ids) == max_seq_length
     assert len(input_mask) == max_seq_length
-    assert len(segment_ids) == max_seq_length
     assert len(label_ids) == max_seq_length
 
     feature = InputFeatures(
         input_ids=input_ids,
         input_mask=input_mask,
-        segment_ids=segment_ids,
+        segment_ids=[0] * max_seq_length,
         label_ids=label_ids,
     )
     write_tokens(ntokens, mode)
     return feature
 
 
-def filed_based_convert_examples_to_features(
-        examples, label_list, max_seq_length, tokenizer, output_file, mode=None
-):
+def filed_based_convert_examples_to_features(examples, max_seq_length, tokenizer, output_file, mode=None):
     writer = tf.python_io.TFRecordWriter(output_file)
     for (ex_index, example) in enumerate(examples):
         if ex_index % 5000 == 0:
             tf.logging.info("Writing example %d of %d" % (ex_index, len(examples)))
-        feature = convert_single_example(ex_index, example, label_list, max_seq_length, tokenizer, mode)
+        feature = convert_single_example(example, max_seq_length, tokenizer, mode)
 
         def create_int_feature(values):
             f = tf.train.Feature(int64_list=tf.train.Int64List(value=list(values)))
@@ -205,7 +183,6 @@ def filed_based_convert_examples_to_features(
         features["input_mask"] = create_int_feature(feature.input_mask)
         features["segment_ids"] = create_int_feature(feature.segment_ids)
         features["label_ids"] = create_int_feature(feature.label_ids)
-        # features["label_mask"] = create_int_feature(feature.label_mask)
         tf_example = tf.train.Example(features=tf.train.Features(feature=features))
         writer.write(tf_example.SerializeToString())
 
@@ -216,8 +193,6 @@ def file_based_input_fn_builder(input_file, seq_length, is_training, drop_remain
         "input_mask": tf.FixedLenFeature([seq_length], tf.int64),
         "segment_ids": tf.FixedLenFeature([seq_length], tf.int64),
         "label_ids": tf.FixedLenFeature([seq_length], tf.int64),
-        # "label_ids":tf.VarLenFeature(tf.int64),
-        # "label_mask": tf.FixedLenFeature([seq_length], tf.int64),
     }
 
     def _decode_record(record, name_to_features):
@@ -274,9 +249,6 @@ def create_model(bert_config, is_training, input_ids, input_mask,
         logits = tf.matmul(output_layer, output_weight, transpose_b=True)
         logits = tf.nn.bias_add(logits, output_bias)
         logits = tf.reshape(logits, [-1, FLAGS.max_seq_length, 13])
-        # mask = tf.cast(input_mask,tf.float32)
-        # loss = tf.contrib.seq2seq.sequence_loss(logits,labels,mask)
-        # return (loss, logits, predict)
         ##########################################################################
         log_probs = tf.nn.log_softmax(logits, axis=-1)
         one_hot_labels = tf.one_hot(labels, depth=num_labels, dtype=tf.float32)
@@ -332,7 +304,6 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
         elif mode == tf.estimator.ModeKeys.EVAL:
 
             def metric_fn(per_example_loss, label_ids, logits):
-                # def metric_fn(label_ids, logits):
                 predictions = tf.argmax(logits, axis=-1, output_type=tf.int32)
                 precision = tf_metrics.precision(label_ids, predictions, 13, [1, 2, 4, 5, 6, 7, 8, 9], average="macro")
                 recall = tf_metrics.recall(label_ids, predictions, 13, [1, 2, 4, 5, 6, 7, 8, 9], average="macro")
@@ -342,11 +313,9 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
                     "eval_precision": precision,
                     "eval_recall": recall,
                     "eval_f": f,
-                    # "eval_loss": loss,
                 }
 
             eval_metrics = (metric_fn, [per_example_loss, label_ids, logits])
-            # eval_metrics = (metric_fn, [label_ids, logits])
             output_spec = tf.contrib.tpu.TPUEstimatorSpec(
                 mode=mode,
                 loss=total_loss,
@@ -399,8 +368,7 @@ def main(_):
 
     if FLAGS.do_train:
         train_file = os.path.join(FLAGS.output_dir, "train.tf_record")
-        filed_based_convert_examples_to_features(
-            train_examples, label_list, FLAGS.max_seq_length, tokenizer, train_file)
+        filed_based_convert_examples_to_features(train_examples, FLAGS.max_seq_length, tokenizer, train_file)
         tf.logging.info("***** Running training *****")
         tf.logging.info("  Num examples = %d", len(train_examples))
         tf.logging.info("  Batch size = %d", FLAGS.train_batch_size)
@@ -414,8 +382,7 @@ def main(_):
     if FLAGS.do_eval:
         eval_examples = processor.get_dev_examples(FLAGS.data_dir)
         eval_file = os.path.join(FLAGS.output_dir, "eval.tf_record")
-        filed_based_convert_examples_to_features(
-            eval_examples, label_list, FLAGS.max_seq_length, tokenizer, eval_file)
+        filed_based_convert_examples_to_features(eval_examples, FLAGS.max_seq_length, tokenizer, eval_file)
 
         tf.logging.info("***** Running evaluation *****")
         tf.logging.info("  Num examples = %d", len(eval_examples))
@@ -438,17 +405,14 @@ def main(_):
                 writer.write("%s = %s\n" % (key, str(result[key])))
     if FLAGS.do_predict:
         token_path = os.path.join(FLAGS.output_dir, "token_test.txt")
-        with open('./output/label2id.pkl', 'rb') as rf:
-            label2id = pickle.load(rf)
-            id2label = {value: key for key, value in label2id.items()}
+        id2label = {value: key for key, value in label_map.items()}
         if os.path.exists(token_path):
             os.remove(token_path)
         predict_examples = processor.get_test_examples(FLAGS.data_dir)
 
         predict_file = os.path.join(FLAGS.output_dir, "predict.tf_record")
-        filed_based_convert_examples_to_features(predict_examples, label_list,
-                                                 FLAGS.max_seq_length, tokenizer,
-                                                 predict_file, mode="test")
+        filed_based_convert_examples_to_features(predict_examples, FLAGS.max_seq_length, tokenizer, predict_file,
+                                                 mode="test")
 
         tf.logging.info("***** Running prediction*****")
         tf.logging.info("  Num examples = %d", len(predict_examples))
