@@ -10,7 +10,7 @@ class NerProcessorTest(tf.test.TestCase):
 
     def test_convert_single_example(self):
         example = NerProcessor().get_test_examples('./data/ner')
-        features = convert_single_example(example[0], 512, tokenization.FullTokenizer(), 'test')
+        features = convert_single_example(example[0], 512, tokenization.FullTokenizer())
         print(features.input_ids)
         print(features.input_mask)
         print(features.segment_ids)

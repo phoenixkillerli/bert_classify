@@ -9,8 +9,6 @@ import optimization
 import tf_metrics
 import tokenization
 
-# import pickle
-
 flags = tf.flags
 
 FLAGS = flags.FLAGS
@@ -113,17 +111,7 @@ class NerProcessor():
         return examples
 
 
-def write_tokens(tokens, mode):
-    if mode == "test":
-        path = os.path.join(FLAGS.output_dir, "token_" + mode + ".txt")
-        wf = codecs.open(path, 'a', "utf-8")
-        for token in tokens:
-            if token != "**NULL**":
-                wf.write(token + '\n')
-        wf.close()
-
-
-def convert_single_example(example, max_seq_length, tokenizer, mode):
+def convert_single_example(example, max_seq_length, tokenizer):
     textlist = example.text.split(' ')
     labellist = example.label.split(' ')
     tokens = []
@@ -164,7 +152,6 @@ def convert_single_example(example, max_seq_length, tokenizer, mode):
         segment_ids=[0] * max_seq_length,
         label_ids=label_ids,
     )
-    write_tokens(ntokens, mode)
     return feature
 
 
@@ -173,7 +160,7 @@ def filed_based_convert_examples_to_features(examples, max_seq_length, tokenizer
     for (ex_index, example) in enumerate(examples):
         if ex_index % 5000 == 0:
             tf.logging.info("Writing example %d of %d" % (ex_index, len(examples)))
-        feature = convert_single_example(example, max_seq_length, tokenizer, mode)
+        feature = convert_single_example(example, max_seq_length, tokenizer)
 
         def create_int_feature(values):
             f = tf.train.Feature(int64_list=tf.train.Int64List(value=list(values)))
@@ -345,8 +332,7 @@ def main(_):
 
     if FLAGS.do_train:
         train_examples = processor.get_train_examples(FLAGS.data_dir)
-        num_train_steps = int(
-            len(train_examples) / FLAGS.train_batch_size * FLAGS.num_train_epochs)
+        num_train_steps = int(len(train_examples) / FLAGS.train_batch_size * FLAGS.num_train_epochs)
         num_warmup_steps = int(num_train_steps * FLAGS.warmup_proportion)
 
     model_fn = model_fn_builder(
@@ -388,16 +374,12 @@ def main(_):
         tf.logging.info("***** Running evaluation *****")
         tf.logging.info("  Num examples = %d", len(eval_examples))
         tf.logging.info("  Batch size = %d", FLAGS.eval_batch_size)
-        eval_steps = None
-        if FLAGS.use_tpu:
-            eval_steps = int(len(eval_examples) / FLAGS.eval_batch_size)
-        eval_drop_remainder = True if FLAGS.use_tpu else False
         eval_input_fn = file_based_input_fn_builder(
             input_file=eval_file,
             seq_length=FLAGS.max_seq_length,
             is_training=False,
-            drop_remainder=eval_drop_remainder)
-        result = estimator.evaluate(input_fn=eval_input_fn, steps=eval_steps)
+            drop_remainder=False)
+        result = estimator.evaluate(input_fn=eval_input_fn, steps=None)
         output_eval_file = os.path.join(FLAGS.output_dir, "eval_results.txt")
         with codecs.open(output_eval_file, "w", "utf-8") as writer:
             tf.logging.info("***** Eval results *****")
@@ -405,16 +387,11 @@ def main(_):
                 tf.logging.info("  %s = %s", key, str(result[key]))
                 writer.write("%s = %s\n" % (key, str(result[key])))
     if FLAGS.do_predict:
-        token_path = os.path.join(FLAGS.output_dir, "token_test.txt")
         id2label = {value: key for key, value in label_map.items()}
-        if os.path.exists(token_path):
-            os.remove(token_path)
         predict_examples = processor.get_test_examples(FLAGS.data_dir)
 
         predict_file = os.path.join(FLAGS.output_dir, "predict.tf_record")
-        filed_based_convert_examples_to_features(predict_examples, FLAGS.max_seq_length, tokenizer, predict_file,
-                                                 mode="test")
-
+        filed_based_convert_examples_to_features(predict_examples, FLAGS.max_seq_length, tokenizer, predict_file)
         tf.logging.info("***** Running prediction*****")
         tf.logging.info("  Num examples = %d", len(predict_examples))
         tf.logging.info("  Batch size = %d", FLAGS.predict_batch_size)

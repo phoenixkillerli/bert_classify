@@ -6,7 +6,7 @@ import tensorflow as tf
 import modeling
 import optimization
 import tokenization
-from common_tool import convert_single_example
+from common_tool import convert_single_example, label_list
 from task import DataProcessor
 
 flags = tf.flags
@@ -23,8 +23,6 @@ flags.DEFINE_string(
     "bert_config_file", './model/bert_config.json',
     "The config json file corresponding to the pre-trained BERT model. "
     "This specifies the model architecture.")
-
-flags.DEFINE_string("task_name", 'data_process', "The name of the task to train.")
 
 flags.DEFINE_string("vocab_file", './model/vocab.txt',
                     "The vocabulary file that the BERT model was trained on.")
@@ -294,11 +292,6 @@ def serving_input_fn():
 
 def main(_):
     tf.logging.set_verbosity(tf.logging.INFO)
-
-    processors = {
-        "data_process": DataProcessor,
-    }
-
     bert_config = modeling.BertConfig.from_json_file(FLAGS.bert_config_file)
 
     if FLAGS.max_seq_length > bert_config.max_position_embeddings:
@@ -308,11 +301,7 @@ def main(_):
             (FLAGS.max_seq_length, bert_config.max_position_embeddings))
 
     tf.gfile.MakeDirs(FLAGS.output_dir)
-
-    task_name = FLAGS.task_name.lower()
-    processor = processors[task_name]()
-    label_list = processor.get_labels()
-
+    processor = DataProcessor
     tokenizer = tokenization.FullTokenizer(
         vocab_file=FLAGS.vocab_file, do_lower_case=FLAGS.do_lower_case)
 
@@ -323,8 +312,7 @@ def main(_):
     num_warmup_steps = None
     if FLAGS.do_train:
         train_examples = processor.get_train_examples(FLAGS.data_dir)
-        num_train_steps = int(
-            len(train_examples) / FLAGS.train_batch_size * FLAGS.num_train_epochs)
+        num_train_steps = int(len(train_examples) / FLAGS.train_batch_size * FLAGS.num_train_epochs)
         num_warmup_steps = int(num_train_steps * FLAGS.warmup_proportion)
 
     model_fn = model_fn_builder(
@@ -337,8 +325,6 @@ def main(_):
         use_tpu=False,
         use_one_hot_embeddings=False)
 
-    # If TPU is not available, this will fall back to normal Estimator on CPU
-    # or GPU.
     estimator = tf.contrib.tpu.TPUEstimator(
         use_tpu=False,
         model_fn=model_fn,
@@ -378,7 +364,6 @@ def main(_):
                         len(eval_examples) - num_actual_eval_examples)
         tf.logging.info("  Batch size = %d", FLAGS.eval_batch_size)
 
-        # This tells the estimator to run through the entire set.
         eval_steps = None
         eval_drop_remainder = False
         eval_input_fn = file_based_input_fn_builder(
